@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>Nebula with Supernova and Angular Momentum</title>
+    <style>
+        body {
+            margin: 0;
+            overflow: hidden;
+            background: black;
+        }
+        canvas {
+            display: block;
+        }
+    </style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<script>
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+
+    const centerX = canvas.width / 2;
+    const centerY = canvas.height / 2;
+
+    const particles = [];
+    let shockRadius = 0;
+    const shockSpeed = 2;
+    let triggered = false;
+
+    class NebulaParticle {
+        constructor() {
+            this.reset();
+        }
+
+        reset() {
+            this.x = Math.random() * canvas.width;
+            this.y = (Math.random() + (canvas.height - canvas.width) / (canvas.width * 2)) * canvas.width;
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = (Math.random() - 0.5) * 2;
+            this.ax = 0;
+            this.ay = 0;
+            this.size = Math.random()*1.5;
+            const hue = Math.random() * 360;
+            this.color = `hsla(${hue}, 100%, 70%, 0.2)`;
+            this.affected = false;
+        }
+
+        update() {
+            const dx = this.x - centerX;
+            const dy = this.y - centerY;
+            let dist = Math.sqrt(dx * dx + dy * dy) + 0.1;  // avoid div by zero
+
+            // Compute radial and tangential velocity components
+            let vx_radial = (this.vx * dx + this.vy * dy) / dist;
+            let vx_tangential = (-this.vx * dy + this.vy * dx) / dist;
+
+            // Compute angular momentum = r * v_tangential
+            const angularMomentum = dist * vx_tangential;
+
+            if (triggered && !this.affected && dist < shockRadius) {
+                this.affected = true;
+            }
+
+            if (this.affected) {
+                // Inward radial acceleration to simulate collapse
+                const inwardSpeed = 0.01;
+
+                // Normalize radius vector
+                const nx = dx / dist;
+                const ny = dy / dist;
+
+                // Radial acceleration (towards center)
+                const ax_radial = -nx * inwardSpeed;
+                const ay_radial = -ny * inwardSpeed;
+
+                this.ax += ax_radial;
+                this.ay += ay_radial;
+            }
+
+            // Update velocity by acceleration
+            this.vx += this.ax;
+            this.vy += this.ay;
+
+            // Apply slight friction
+            this.vx *= 0.999;
+            this.vy *= 0.999;
+
+            // Update position by velocity
+            this.x += this.vx;
+            this.y += this.vy;
+
+            // After moving, recalculate radius and angular momentum
+            const new_dx = this.x - centerX;
+            const new_dy = this.y - centerY;
+            dist = Math.sqrt(new_dx * new_dx + new_dy * new_dy) + 0.1;
+
+            // Recalculate radial and tangential velocities from current vx, vy
+            vx_radial = (this.vx * new_dx + this.vy * new_dy) / dist;
+
+            // Enforce angular momentum conservation:
+            // tangential velocity = angularMomentum / dist
+            vx_tangential = angularMomentum / dist;
+
+            // Convert radial and tangential velocities back to vx, vy
+            this.vx = (vx_radial * new_dx - vx_tangential * new_dy) / dist;
+            this.vy = (vx_radial * new_dy + vx_tangential * new_dx) / dist;
+
+            // Reset accelerations for next frame
+            this.ax = 0;
+            this.ay = 0;
+        }
+
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.size, 0, 2 * Math.PI);
+            ctx.fillStyle = this.color;
+            ctx.fill();
+        }
+    }
+
+    // Create initial nebula particles
+    for (let i = 0; i < 20000; i++) {
+        particles.push(new NebulaParticle());
+    }
+
+    function drawShockwave() {
+        ctx.beginPath();
+        ctx.arc(centerX, centerY, shockRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = "red";
+        ctx.lineWidth = 2;
+        ctx.stroke();
+    }
+
+    function animate() {
+        ctx.fillStyle = "rgba(0, 0, 0, 0.2)";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+        if (triggered) {
+            shockRadius += shockSpeed;
+            drawShockwave();
+        }
+
+        for (const p of particles) {
+            p.update();
+            p.draw();
+        }
+
+        requestAnimationFrame(animate);
+    }
+
+    window.addEventListener("click", () => {
+        if (!triggered) {
+            triggered = true;
+            shockRadius = 0;
+        }
+    });
+
+    animate();
+</script>
+</body>
+</html>
